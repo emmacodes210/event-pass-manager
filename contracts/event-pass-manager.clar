@@ -176,3 +176,37 @@
     ;; Verifies if a principal is the legitimate owner of a pass
     (ok (is-eq (nft-get-owner? digital-pass pass-id) (some claimed-owner))))
 
+;; Enhanced management functions
+(define-public (return-to-issuer (pass-id uint))
+    ;; Returns a pass to the original issuer
+    (begin
+        (let ((holder (unwrap! (nft-get-owner? digital-pass pass-id) err-pass-not-available)))
+            (asserts! (is-eq tx-sender holder) err-unauthorized-holder)
+            (try! (nft-transfer? digital-pass pass-id tx-sender contract-owner))
+            (ok true))))
+
+(define-public (set-non-transferable (pass-id uint))
+    ;; Sets a pass as non-transferable by administrative action
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-unauthorized-access)
+        (asserts! (not (check-revocation-status pass-id)) err-previously-revoked)
+        (map-set revoked-passes pass-id true)
+        (ok true)))
+
+(define-public (restore-pass (pass-id uint))
+    ;; Reactivates a previously revoked pass
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-unauthorized-access)
+        (asserts! (check-revocation-status pass-id) err-revocation-failed)
+        (map-set revoked-passes pass-id false)
+        (ok true)))
+
+(define-public (process-refund (pass-id uint))
+    ;; Processes refund for a revoked pass (admin only)
+    (let ((pass-holder (unwrap! (nft-get-owner? digital-pass pass-id) err-pass-not-available)))
+        (begin
+            (asserts! (is-eq tx-sender contract-owner) err-unauthorized-access)
+            (asserts! (check-revocation-status pass-id) err-previously-revoked)
+            ;; Refund logic would be implemented here
+            (ok pass-holder))))
+
