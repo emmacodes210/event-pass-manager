@@ -312,4 +312,57 @@
     ;; Verifies validity of pass information
     (ok (>= (len pass-info) u1)))
 
+(define-read-only (is-contract-controller (user principal))
+    ;; Checks if a user is the contract controller
+    (ok (is-eq user contract-owner)))
+
+(define-read-only (check-pass-revoked (pass-id uint))
+    ;; Checks if a pass has been revoked
+    (ok (check-revocation-status pass-id)))
+
+(define-read-only (get-issued-count)
+    ;; Returns the count of passes issued
+    (ok (var-get current-pass-count)))
+
+(define-read-only (verify-pass-owner (pass-id uint) (claimed-owner principal))
+    ;; Verifies ownership claim of a pass
+    (ok (is-eq (nft-get-owner? digital-pass pass-id) (some claimed-owner))))
+
+(define-read-only (check-contract-authority)
+    ;; Returns the authorized contract controller
+    (ok contract-owner))
+
+(define-read-only (verify-pass-is-active (pass-id uint))
+    ;; Verifies if a pass is currently active
+    (ok (and (is-valid-pass pass-id)
+             (not (check-revocation-status pass-id)))))
+
+(define-read-only (get-latest-pass)
+    ;; Returns the ID of the most recently created pass
+    (ok (var-get current-pass-count)))
+
+(define-read-only (check-bulk-exists (operation-id uint))
+    ;; Verifies existence of a bulk operation
+    (ok (not (is-eq (map-get? bulk-issuance-records operation-id) none))))
+
+(define-read-only (verify-pass-usability (pass-id uint))
+    ;; Verifies if a pass is usable for an event
+    (ok (and 
+        (not (check-revocation-status pass-id)) 
+        (is-eq (nft-get-owner? digital-pass pass-id) (some contract-owner)))))
+
+(define-read-only (get-pass-authenticity (pass-id uint))
+    ;; Verifies the complete authenticity of a pass
+    (ok (and 
+        (is-valid-pass pass-id)
+        (not (check-revocation-status pass-id)))))
+
+(define-read-only (check-admin-role)
+    ;; Checks if caller has admin role
+    (ok (is-eq tx-sender contract-owner)))
+
+;; System initialization
+(begin
+    (var-set current-pass-count u0))  ;; Initialize the pass counter
+
 
