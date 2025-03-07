@@ -86,4 +86,93 @@
                         error previous-results)
         error previous-results))
 
+(define-public (verify-pass-exists (pass-id uint))
+    ;; Confirms a pass has been registered in the system
+    (ok (not (is-eq (map-get? pass-information pass-id) none))))
+
+(define-public (revoke-pass (pass-id uint))
+    ;; Invalidates a previously issued pass
+    (let ((current-holder (unwrap! (nft-get-owner? digital-pass pass-id) err-pass-not-available)))
+        (asserts! (is-eq tx-sender current-holder) err-unauthorized-holder)
+        (asserts! (not (check-revocation-status pass-id)) err-previously-revoked)
+        (try! (nft-burn? digital-pass pass-id current-holder))
+        (map-set revoked-passes pass-id true)
+        (ok true)))
+
+(define-public (reassign-pass (pass-id uint) (current-holder principal) (new-holder principal))
+    ;; Transfers pass ownership to a different entity
+    (begin
+        (asserts! (is-eq new-holder tx-sender) err-unauthorized-holder)
+        (asserts! (not (check-revocation-status pass-id)) err-previously-revoked)
+        (let ((verified-holder (unwrap! (nft-get-owner? digital-pass pass-id) err-unauthorized-holder)))
+            (asserts! (is-eq verified-holder current-holder) err-unauthorized-holder)
+            (try! (nft-transfer? digital-pass pass-id current-holder new-holder))
+            (ok true))))
+
+;; Information retrieval functions
+(define-read-only (get-pass-details (pass-id uint))
+    ;; Retrieves detailed information for a specific pass
+    (ok (map-get? pass-information pass-id)))
+
+(define-read-only (is-pass-transferable (pass-id uint))
+    ;; Determines if a pass can be transferred to another owner
+    (ok (not (check-revocation-status pass-id))))
+
+(define-read-only (get-pass-status (pass-id uint))
+    ;; Returns the current status of a pass (revoked or active)
+    (ok (check-revocation-status pass-id)))
+
+(define-read-only (get-issued-pass-count)
+    ;; Provides the total number of passes issued to date
+    (ok (+ (var-get current-pass-count) u1)))
+
+(define-read-only (get-bulk-metadata (operation-id uint))
+    ;; Retrieves metadata for a specific bulk issuance operation
+    (ok (map-get? bulk-issuance-records operation-id)))
+
+(define-read-only (check-pass-validity (pass-id uint))
+    ;; Comprehensive verification of a pass's current validity
+    (ok (and (not (is-eq (map-get? pass-information pass-id) none))
+             (not (check-revocation-status pass-id)))))
+
+(define-read-only (get-pass-owner (pass-id uint))
+    ;; Identifies the current owner of a specific pass
+    (ok (nft-get-owner? digital-pass pass-id)))
+
+(define-read-only (check-pass-revocation (pass-id uint))
+    ;; Determines if a pass has been revoked
+    (ok (check-revocation-status pass-id)))
+
+(define-read-only (verify-admin-identity (user principal))
+    ;; Confirms if a user has administrative privileges
+    (ok (is-eq user contract-owner)))
+
+(define-read-only (check-pass-info-validity (pass-data (string-ascii 128)))
+    ;; Validates the format and content of pass information
+    (ok (>= (len pass-data) u1)))
+
+(define-read-only (get-most-recent-pass-id)
+    ;; Returns the identifier of the most recently issued pass
+    (ok (var-get current-pass-count)))
+
+(define-read-only (verify-pass-status (pass-id uint))
+    ;; Comprehensive status check for a specific pass
+    (ok (if (check-revocation-status pass-id) "Revoked" "Active")))
+
+(define-read-only (can-issue-more-passes)
+    ;; Determines if the system can accept more pass issuance
+    (ok true))  ;; No limit implemented in current version
+
+(define-read-only (check-admin-authority)
+    ;; Returns the address with administrative authority
+    (ok contract-owner))
+
+(define-read-only (verify-pass-authenticity (pass-id uint))
+    ;; Complete verification of a pass's authenticity and validity
+    (ok (and (is-valid-pass pass-id)
+             (not (check-revocation-status pass-id)))))
+
+(define-read-only (check-ownership (pass-id uint) (claimed-owner principal))
+    ;; Verifies if a principal is the legitimate owner of a pass
+    (ok (is-eq (nft-get-owner? digital-pass pass-id) (some claimed-owner))))
 
