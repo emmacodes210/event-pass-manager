@@ -210,3 +210,106 @@
             ;; Refund logic would be implemented here
             (ok pass-holder))))
 
+(define-public (reissue-pass (pass-id uint))
+    ;; Reissues a revoked pass to make it valid again
+    (begin
+        (asserts! (is-eq tx-sender contract-owner) err-unauthorized-access)
+        (asserts! (check-revocation-status pass-id) err-pass-not-available)
+        (map-set revoked-passes pass-id false)
+        (ok true)))
+
+;; Additional query functions
+(define-read-only (get-active-passes-count)
+    ;; Returns count of currently active passes
+    (ok (var-get current-pass-count)))
+
+(define-read-only (verify-bulk-operation (operation-id uint))
+    ;; Verifies if a bulk operation exists with metadata
+    (ok (not (is-eq (map-get? bulk-issuance-records operation-id) none))))
+
+(define-read-only (verify-user-admin-status (user principal))
+    ;; Verifies if a user has administrative status
+    (ok (is-eq user contract-owner)))
+
+(define-read-only (check-bulk-size-validity (size uint))
+    ;; Verifies if a bulk operation size is within limits
+    (ok (<= size bulk-issuance-limit)))
+
+(define-read-only (check-pass-metadata (pass-id uint))
+    ;; Verifies if a pass has associated metadata
+    (ok (not (is-eq (map-get? bulk-issuance-records pass-id) none))))
+
+(define-read-only (get-revocation-status (pass-id uint))
+    ;; Returns the revocation status of a pass
+    (ok (check-revocation-status pass-id)))
+
+(define-read-only (get-total-pass-count)
+    ;; Returns the total number of passes issued
+    (ok (+ (var-get current-pass-count) u1)))
+
+(define-read-only (check-pass-transferability (pass-id uint))
+    ;; Verifies if a pass can be transferred
+    (ok (not (check-revocation-status pass-id))))
+
+(define-read-only (get-pass-history (pass-id uint))
+    ;; Retrieves historical information for a pass
+    (ok (map-get? pass-information pass-id)))
+
+(define-read-only (get-pass-holder (pass-id uint))
+    ;; Returns the current holder of a specific pass
+    (ok (nft-get-owner? digital-pass pass-id)))
+
+(define-read-only (is-pass-active (pass-id uint))
+    ;; Verifies if a pass is currently active (not revoked)
+    (ok (and (not (is-eq (map-get? pass-information pass-id) none))
+             (not (check-revocation-status pass-id)))))
+
+(define-read-only (verify-admin-status)
+    ;; Verifies if current sender has admin privileges
+    (ok (is-eq tx-sender contract-owner)))
+
+(define-read-only (get-most-recent-bulk-data)
+    ;; Retrieves data from the most recent bulk operation
+    (map-get? bulk-issuance-records (var-get current-pass-count)))
+
+(define-read-only (get-pass-record (pass-id uint))
+    ;; Retrieves the full record for a specific pass
+    (ok (map-get? pass-information pass-id)))
+
+(define-read-only (verify-pass-record-exists (pass-id uint))
+    ;; Verifies if a pass record exists in the system
+    (ok (not (is-eq (map-get? pass-information pass-id) none))))
+
+(define-read-only (get-contract-authority)
+    ;; Returns the authority controlling the contract
+    (ok contract-owner))
+
+(define-read-only (check-availability-for-transfer (pass-id uint))
+    ;; Checks if a pass is available for transfer
+    (ok (and 
+        (not (check-revocation-status pass-id))
+        (not (is-eq (map-get? pass-information pass-id) none)))))
+
+(define-read-only (get-issued-passes)
+    ;; Returns the total count of issued passes
+    (ok (var-get current-pass-count)))
+
+(define-read-only (check-pass-existence (pass-id uint))
+    ;; Verifies existence of pass in the system
+    (ok (not (is-eq (map-get? pass-information pass-id) none))))
+
+(define-read-only (verify-pass-validity (pass-id uint))
+    ;; Comprehensive validation of a pass
+    (ok (and 
+        (is-valid-pass pass-id)
+        (not (check-revocation-status pass-id)))))
+
+(define-read-only (get-operation-details (operation-id uint))
+    ;; Retrieves details of a specific operation
+    (ok (map-get? bulk-issuance-records operation-id)))
+
+(define-read-only (verify-info-validity (pass-info (string-ascii 128)))
+    ;; Verifies validity of pass information
+    (ok (>= (len pass-info) u1)))
+
+
